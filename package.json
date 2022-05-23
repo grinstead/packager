@@ -1,0 +1,23 @@
+{
+  "name": "@grinstead/packager",
+  "version": "0.1.0",
+  "description": "Utility for publishing typescript packages to npm",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/grinstead/packager.git"
+  },
+  "keywords": [
+    "packager",
+    "closure-compiler"
+  ],
+  "author": "@grinstead",
+  "license": "BSD-2-Clause",
+  "bugs": {
+    "url": "https://github.com/grinstead/packager/issues"
+  },
+  "homepage": "https://github.com/grinstead/packager#readme"
+}

@@ -3,29 +3,6 @@
  * This file defines a script for packaging javascript files together (and
  * minifying them) with Google's Closure Compiler.
  */
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -36,20 +13,42 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const fs = __importStar(require("fs/promises"));
+const google_closure_compiler_1 = require("google-closure-compiler");
 const zod_1 = require("zod");
 function main(rawArgs) {
     return __awaiter(this, void 0, void 0, function* () {
         const args = validateArgsAndPrintErrors(zod_1.z.object({
             topLevel: zod_1.z.array(zod_1.z.string()).min(1),
-            options: zod_1.z.object({}),
+            options: zod_1.z.object({
+                output: zod_1.z.string(),
+            }),
         }), rawArgs);
         // it will have already printed the errors
         if (!args)
             throw new Error("Invalid Command Line Args");
-        const [filename] = args.topLevel;
-        const contents = yield fs.readFile(filename, { encoding: "utf-8" });
-        console.log(contents);
+        const compiled = yield new Promise((resolve, reject) => {
+            const compiler = new google_closure_compiler_1.compiler({
+                js: args.topLevel,
+                compilation_level: "ADVANCED",
+                assume_function_wrapper: true,
+                process_closure_primitives: false,
+                rewrite_polyfills: false,
+                inject_libraries: false,
+            });
+            compiler.run((code, out, err) => {
+                if (code === 0) {
+                    resolve(out);
+                }
+                else {
+                    out && console.log(out);
+                    err && console.error(err);
+                    reject(new Error(`ClosureError: ${code}`));
+                }
+            });
+        });
+        console.log(compiled);
+        // const parsed = acorn.parse(contents, { ecmaVersion: "latest" });
+        // console.log(parsed);
     });
 }
 /**
@@ -60,7 +59,7 @@ function main(rawArgs) {
  * @returns An args object
  */
 function parseArgs(args, parseOptions) {
-    var _a;
+    var _a, _b;
     const shorthand = parseOptions === null || parseOptions === void 0 ? void 0 : parseOptions.shorthand;
     const topLevel = [];
     const options = {};
@@ -91,7 +90,7 @@ function parseArgs(args, parseOptions) {
             const equalsIndex = arg.indexOf("=");
             if (equalsIndex < 0) {
                 // there is no equals sign, so this is an open parameter
-                handleArg(arg);
+                handleArg(arg.substring(2));
             }
             else {
                 handleArg(arg.substring(2, equalsIndex));
@@ -102,10 +101,13 @@ function parseArgs(args, parseOptions) {
             }
         }
         else if (arg.length >= 2 && arg.startsWith("-")) {
-            for (let j = i; j < arg.length; j++) {
+            const trailingIndex = arg.length - 1;
+            for (let j = 1; j < trailingIndex; j++) {
                 const letter = arg[j];
                 handleArg((_a = shorthand === null || shorthand === void 0 ? void 0 : shorthand[letter]) !== null && _a !== void 0 ? _a : letter, true);
             }
+            const trailingLetter = arg[trailingIndex];
+            handleArg((_b = shorthand === null || shorthand === void 0 ? void 0 : shorthand[trailingLetter]) !== null && _b !== void 0 ? _b : trailingLetter);
         }
         else {
             handleValue(arg);
@@ -114,6 +116,7 @@ function parseArgs(args, parseOptions) {
     return { topLevel, options };
 }
 function validateArgsAndPrintErrors(schema, args) {
+    console.log(args);
     const parse = schema.safeParse(args);
     if (parse.success) {
         return parse.data;
@@ -135,4 +138,4 @@ function validateArgsAndPrintErrors(schema, args) {
 // Run the Script
 /////////////////////////////////////////////////////////////////////////////
 // the array looks like ["node", "closure_shim", ...args], so strip out those leadins
-main(parseArgs(process.argv.slice(2)));
+main(parseArgs(process.argv.slice(2), { shorthand: { o: "output" } }));

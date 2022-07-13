@@ -11,8 +11,13 @@ declare module "google-closure-compiler" {
     constructor(args: {
       js: string | string[];
       compilation_level: "ADVANCED";
-      js_output_file: string;
+      js_output_file?: string;
       debug?: boolean;
+      assume_function_wrapper?: boolean;
+      process_closure_primitives?: boolean;
+      rewrite_polyfills?: boolean;
+      inject_libraries?: boolean;
+      variable_renaming_report?: string;
     });
 
     run(

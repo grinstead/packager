@@ -4,15 +4,18 @@
  */
 
 import * as acorn from "acorn";
-import { compiler as ClosureCompiler, compiler } from "google-closure-compiler";
+import { compiler as ClosureCompiler } from "google-closure-compiler";
 import * as fs from "fs/promises";
+import { constants as FS } from "fs";
 import { z, ZodSchema } from "zod";
 
 async function main(rawArgs: Args) {
   const args = validateArgsAndPrintErrors(
     z.object({
       topLevel: z.array(z.string()).min(1),
-      options: z.object({}),
+      options: z.object({
+        output: z.string(),
+      }),
     }),
     rawArgs
   );
@@ -20,10 +23,33 @@ async function main(rawArgs: Args) {
   // it will have already printed the errors
   if (!args) throw new Error("Invalid Command Line Args");
 
-  const [filename] = args.topLevel;
-  const contents = await fs.readFile(filename, { encoding: "utf-8" });
+  fs.copyFile("hi", "yo");
 
-  console.log(contents);
+  const compiled = await new Promise((resolve, reject) => {
+    const compiler = new ClosureCompiler({
+      js: args.topLevel,
+      compilation_level: "ADVANCED",
+      assume_function_wrapper: true,
+      process_closure_primitives: false,
+      rewrite_polyfills: false,
+      inject_libraries: false,
+    });
+
+    compiler.run((code, out, err) => {
+      if (code === 0) {
+        resolve(out);
+      } else {
+        out && console.log(out);
+        err && console.error(err);
+        reject(new Error(`ClosureError: ${code}`));
+      }
+    });
+  });
+
+  console.log(compiled);
+
+  // const parsed = acorn.parse(contents, { ecmaVersion: "latest" });
+  // console.log(parsed);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -84,7 +110,7 @@ function parseArgs(args: string[], parseOptions?: ArgParseOptions): Args {
       const equalsIndex = arg.indexOf("=");
       if (equalsIndex < 0) {
         // there is no equals sign, so this is an open parameter
-        handleArg(arg);
+        handleArg(arg.substring(2));
       } else {
         handleArg(arg.substring(2, equalsIndex));
 
@@ -94,10 +120,14 @@ function parseArgs(args: string[], parseOptions?: ArgParseOptions): Args {
         }
       }
     } else if (arg.length >= 2 && arg.startsWith("-")) {
-      for (let j = i; j < arg.length; j++) {
+      const trailingIndex = arg.length - 1;
+      for (let j = 1; j < trailingIndex; j++) {
         const letter = arg[j];
         handleArg(shorthand?.[letter] ?? letter, true);
       }
+
+      const trailingLetter = arg[trailingIndex];
+      handleArg(shorthand?.[trailingLetter] ?? trailingLetter);
     } else {
       handleValue(arg);
     }
@@ -110,6 +140,8 @@ function validateArgsAndPrintErrors<T>(
   schema: ZodSchema<T, any, Args>,
   args: Args
 ): void | T {
+  console.log(args);
+
   const parse = schema.safeParse(args);
 
   if (parse.success) {
@@ -138,4 +170,4 @@ function validateArgsAndPrintErrors<T>(
 /////////////////////////////////////////////////////////////////////////////
 
 // the array looks like ["node", "closure_shim", ...args], so strip out those leadins
-main(parseArgs(process.argv.slice(2)));
+main(parseArgs(process.argv.slice(2), { shorthand: { o: "output" } }));
